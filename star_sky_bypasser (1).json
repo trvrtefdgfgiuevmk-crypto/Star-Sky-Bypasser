@@ -1,4 +1,100 @@
-{
-  "name": "Star Sky Bypasser",
-  "downloads": []
-}
+import requests
+import json
+
+def main():
+    urls = [
+        "https://hydralinks.cloud/sources/fitgirl.json",
+        "https://hydralinks.cloud/sources/onlinefix.json",
+        "https://wkeynhk.online/steamgg.json",
+        "https://davidkazumisource.com/fontekazumi.json",
+        "https://raw.githubusercontent.com/KekitU/rutracker-hydra-links/main/all_categories.json"
+    ]
+
+    fonte_final = {
+        "name": "Star Sky Bypasser",
+        "downloads": []
+    }
+
+    uris_adicionadas = set()
+    total_analisado = 0
+
+    print("=== Iniciando Extração Profunda: Star Sky Bypasser ===")
+    
+    for i, url in enumerate(urls, 1):
+        print(f"[{i}/5] Processando link: {url}")
+        try:
+            response = requests.get(url, timeout=25)
+            if response.status_code != 200:
+                print(f"    -> Erro de conexão: Status {response.status_code}")
+                continue
+                
+            dados = response.json()
+            
+            # SE FOR A QUINTA FONTE (RUTRACKER - FORMATO DE CATEGORIAS EXTRA)
+            if "categories" in dados or isinstance(dados, dict) and not dados.get("downloads"):
+                print("    -> Detectado formato de múltiplas categorias (Rutracker). Vasculhando subpastas...")
+                jogos_da_fonte = []
+                
+                # O Rutracker organiza por categorias -> subcategorias -> downloads
+                categorias = dados.get("categories", {})
+                if isinstance(categorias, list):
+                    # Caso venha como lista de dicionários
+                    for cat in categorias:
+                        jogos_da_fonte.extend(cat.get("downloads", []))
+                elif isinstance(categorias, dict):
+                    # Caso venha mapeado por chaves de texto
+                    for chave_cat, valor_cat in categorias.items():
+                        if isinstance(valor_cat, dict):
+                            jogos_da_fonte.extend(valor_cat.get("downloads", []))
+                        elif isinstance(valor_cat, list):
+                            jogos_da_fonte.extend(valor_cat)
+                
+                # Se não achou na chave categories, tenta varrer o dicionário raiz completo
+                if not jogos_da_fonte:
+                    for chave, valor in dados.items():
+                        if isinstance(valor, list):
+                            jogos_da_fonte.extend(valor)
+                        elif isinstance(valor, dict) and "downloads" in valor:
+                            jogos_da_fonte.extend(valor["downloads"])
+            
+            # SE FOREM AS FONTES PADRÕES (1 a 4)
+            else:
+                jogos_da_fonte = dados.get("downloads", [])
+            
+            total_analisado += len(jogos_da_fonte)
+            contagem_antes = len(fonte_final["downloads"])
+            
+            # Adiciona os jogos limpando as duplicadas
+            for jogo in jogos_da_fonte:
+                if not isinstance(jogo, dict):
+                    continue
+                uris = jogo.get("uris", [])
+                if uris:
+                    chave_unica = tuple(uris) if isinstance(uris, list) else uris
+                    if chave_unica not in uris_adicionadas:
+                        uris_adicionadas.add(chave_unica)
+                        fonte_final["downloads"].append(jogo)
+            
+            adicionados = len(fonte_final["downloads"]) - contagem_antes
+            print(f"    -> Concluído! Encontrados {len(jogos_da_fonte)} nesta fonte. (+{adicionados} novos inseridos)")
+            
+        except Exception as e:
+            print(f"    -> Falha crítica ao ler link: {e}")
+
+    print("\n=== Gravando Arquivo Super Fonte ===")
+    nome_arquivo = "star_sky_bypasser.json"
+    
+    try:
+        with open(nome_arquivo, "w", encoding="utf-8") as f:
+            json.dump(fonte_final, f, ensure_ascii=False, indent=2)
+            
+        print(f"\nSucesso Absoluto! O arquivo '{nome_arquivo}' foi atualizado.")
+        print(f"Total bruto de jogos analisados: {total_analisado}")
+        print(f"Total líquido combinado (sem duplicados): {len(fonte_final['downloads'])}")
+        print("Agora sim, todas as 5 fontes estão misturadas por completo!")
+        
+    except IOError as e:
+        print(f"Erro ao salvar arquivo: {e}")
+
+if __name__ == "__main__":
+    main()
